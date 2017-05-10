@@ -160,13 +160,13 @@ public class Scheduler {
                     for (Map.Entry<String, Future<Integer>> entry : futures.entrySet()) {
                         if (entry.getValue().isDone()) {
                             if (entry.getValue().get() == 0) {
+                                runningJobs.remove(entry.getKey());
                                 logger.info("服务 {} 运行成功, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
                                 completedJobs.put(entry.getKey());
                             } else {
+                                runningJobs.remove(entry.getKey());
                                 logger.error("服务 {} 运行失败, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
                             }
-
-                            runningJobs.remove(entry.getKey());
 
                             rmIds.add(entry.getKey());
                         }
