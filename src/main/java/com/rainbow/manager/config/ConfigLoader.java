@@ -53,7 +53,7 @@ public class ConfigLoader {
                 if (childFile.isDirectory()) {
                     dirs.addAll(getConfDirs(childFile.getCanonicalPath(), depth + 1));
                 } else {
-                    if (depth != 0) {
+                    if (depth != 0 && childFile.getCanonicalPath().endsWith(".json")) {
                         dirs.add(childFile.getParent());
                     }
                 }
