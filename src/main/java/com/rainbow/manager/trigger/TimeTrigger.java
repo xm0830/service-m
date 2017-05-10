@@ -22,6 +22,8 @@ public class TimeTrigger extends Trigger {
         String type = e.config.getType();
         String rule = e.config.getRule();
 
+        rule = rule.replace("-", "");
+        
         check(rule, e.serviceId);
 
         if (type.equals(getAlias())) {
