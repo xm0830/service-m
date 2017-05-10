@@ -133,7 +133,9 @@ public class Scheduler {
                     String jobId = waitRunJobs.take();
                     logger.info("获取待启动的服务：{}，当前待启动队列长度：{}", jobId, waitRunJobs.size());
 
-                    runningJobs.add(jobId);
+                    synchronized (Scheduler.class) {
+                        runningJobs.add(jobId);
+                    }
                     logger.info("添加服务到运行队列：{}，当前运行队列长度：{}", jobId, runningJobs.size());
 
                     Context context = new Context(allJobs.get(jobId), homeDir);
@@ -142,7 +144,10 @@ public class Scheduler {
                     logger.info("开始运行服务: {}", jobId);
 
                     try {
-                        runningJobs.remove(jobId);
+                        synchronized (Scheduler.class) {
+                            runningJobs.remove(jobId);
+                        }
+
                         if (future.get() == 0) {
                             logger.info("服务 {} 运行成功, 当前运行队列长度：{}", jobId, runningJobs.size());
 
