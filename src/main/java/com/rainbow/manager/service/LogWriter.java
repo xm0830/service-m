@@ -15,7 +15,7 @@ public class LogWriter implements Closeable {
     private FileOutputStream fos = null;
     private BufferedWriter bw = null;
 
-    private int maxFileIndex = 20;
+    private int maxFileIndex = 10;
 
     public LogWriter(String logDir, String id) {
         this.logDir = logDir;
