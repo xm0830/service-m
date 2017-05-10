@@ -1,18 +1,15 @@
 package com.rainbow.manager.service;
 
+import com.rainbow.manager.trigger.Trigger;
 import com.rainbow.manager.config.ServiceConfig;
 import com.rainbow.manager.config.TriggerConfig;
 import com.rainbow.manager.trigger.Action;
 import com.rainbow.manager.trigger.Event;
-import com.rainbow.manager.trigger.Trigger;
 import com.rainbow.manager.trigger.TriggerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
 /**
@@ -26,11 +23,13 @@ public class Scheduler {
 
     private ArrayBlockingQueue<String> waitRunJobs = new ArrayBlockingQueue<>(1000);
     private ArrayBlockingQueue<String> completedJobs = new ArrayBlockingQueue<>(1000);
-    private List<String> runningJobs = new ArrayList<>(20);
+    private final List<String> runningJobs = Collections.synchronizedList(new ArrayList<String>(20));
+    private final Map<String, Future<Integer>> futures = Collections.synchronizedMap(new HashMap<String, Future<Integer>>());
 
     private Thread timeCycleThread = new Thread(new TimeCycleThread());
     private Thread jobCompleteThread = new Thread(new JobCompleteThread());
     private Thread submitThread = new Thread(new JobSubmitter());
+    private Thread statusThread = new Thread(new StatusTracker());
     private ExecutorService service = Executors.newFixedThreadPool(10);
 
     private String homeDir = null;
@@ -60,6 +59,7 @@ public class Scheduler {
         timeCycleThread.start();
         jobCompleteThread.start();
         submitThread.start();
+        statusThread.start();
     }
 
     class TimeCycleThread implements Runnable {
@@ -133,9 +133,7 @@ public class Scheduler {
                     String jobId = waitRunJobs.take();
                     logger.info("获取待启动的服务：{}，当前待启动队列长度：{}", jobId, waitRunJobs.size());
 
-                    synchronized (Scheduler.class) {
-                        runningJobs.add(jobId);
-                    }
+                    runningJobs.add(jobId);
                     logger.info("添加服务到运行队列：{}，当前运行队列长度：{}", jobId, runningJobs.size());
 
                     Context context = new Context(allJobs.get(jobId), homeDir);
@@ -143,24 +141,51 @@ public class Scheduler {
                     Future<Integer> future = service.submit(launcher);
                     logger.info("开始运行服务: {}", jobId);
 
-                    try {
-                        synchronized (Scheduler.class) {
-                            runningJobs.remove(jobId);
-                        }
-
-                        if (future.get() == 0) {
-                            logger.info("服务 {} 运行成功, 当前运行队列长度：{}", jobId, runningJobs.size());
-
-                            completedJobs.put(jobId);
-                        } else {
-                            logger.error("服务 {} 运行失败, 当前运行队列长度：{}", jobId, runningJobs.size());
-                        }
-                    } catch (ExecutionException e) {
-                        logger.error("执行服务异常：", e);
-                    }
+                    futures.put(jobId, future);
                 } catch (InterruptedException e) {
                     logger.error("接收到线程中断异常：", e);
                 }
+            }
+        }
+    }
+
+    class StatusTracker implements Runnable {
+
+        @Override
+        public void run() {
+
+            try {
+                List<String> rmIds = new ArrayList<>();
+                while (true) {
+                    for (Map.Entry<String, Future<Integer>> entry : futures.entrySet()) {
+                        if (entry.getValue().isDone()) {
+                            if (entry.getValue().get() == 0) {
+                                logger.info("服务 {} 运行成功, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
+                                completedJobs.put(entry.getKey());
+                            } else {
+                                logger.error("服务 {} 运行失败, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
+                            }
+
+                            runningJobs.remove(entry.getKey());
+
+                            rmIds.add(entry.getKey());
+                        }
+                    }
+
+                    if (rmIds.size() > 0) {
+                        for (String rmId : rmIds) {
+                            futures.remove(rmId);
+                        }
+                        rmIds.clear();
+                    }
+
+                    Thread.sleep(10000);
+                }
+
+            } catch (ExecutionException e) {
+                logger.error("执行服务异常：", e);
+            } catch (InterruptedException e) {
+                logger.error("接收到线程中断异常：", e);
             }
         }
     }
