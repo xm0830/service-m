@@ -35,6 +35,9 @@ public class ConfigLoader {
                 logger.info("发现配置文件：" + files[0]);
                 ServiceConfig config = JSON.parseObject(new FileInputStream(files[0]), ServiceConfig.class);
                 config.setPkgDir(dir);
+                if (configs.contains(config)) {
+                    throw new RuntimeException("发现Id为同一个值：" + config.getId() + " 的多个服务！");
+                }
                 configs.add(config);
             } else {
                 logger.error("目录应只包含一个json配置文件: " + dir);

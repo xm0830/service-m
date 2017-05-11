@@ -3,7 +3,19 @@
   "name": "",
   "desc": "",
   "script": "",
+  "email": {
+    "enable": false,
+    "protocol": "",
+    "server": "",
+    "sendEmailUser": "",
+    "sendEmailPwd": "",
+    "receiveEmailUsers": ""
+  },
   "triggers": [
+    {
+      "type": "",
+      "rule": ""
+    },
     {
       "type": "",
       "rule": ""

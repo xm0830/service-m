@@ -1,5 +1,7 @@
 package com.rainbow.manager.service;
 
+import com.rainbow.manager.common.MailSender;
+import com.rainbow.manager.config.EmailConfig;
 import com.rainbow.manager.config.ServiceConfig;
 import com.rainbow.manager.config.TriggerConfig;
 import com.rainbow.manager.trigger.Action;
@@ -26,10 +28,10 @@ public class Scheduler {
     private final List<String> runningJobs = Collections.synchronizedList(new ArrayList<String>(20));
     private final Map<String, Future<Integer>> futures = Collections.synchronizedMap(new HashMap<String, Future<Integer>>());
 
-    private Thread timeCycleThread = new Thread(new TimeCycleThread());
-    private Thread jobCompleteThread = new Thread(new JobCompleteThread());
-    private Thread submitThread = new Thread(new JobSubmitter());
-    private Thread statusThread = new Thread(new StatusTracker());
+    private Thread timeCycleThread = new Thread(new TimeCycleThread(), "TimeCycleThread");
+    private Thread jobCompleteThread = new Thread(new JobCompleteThread(), "JobCompleteThread");
+    private Thread submitThread = new Thread(new JobSubmitter(), "JobSubmitThread");
+    private Thread statusThread = new Thread(new StatusTracker(), "StatusTrackerThread");
     private ExecutorService service = Executors.newFixedThreadPool(10);
 
     private String homeDir = null;
@@ -86,7 +88,7 @@ public class Scheduler {
 
         @Override
         public void run() {
-            while (Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted()) {
                 for (Map.Entry<String, List<TriggerConfig>> entry : allJobTriggers.entrySet()) {
                     List<TriggerConfig> triggers = entry.getValue();
 
@@ -105,7 +107,7 @@ public class Scheduler {
                 try {
                     Thread.sleep(3000);
                 } catch (InterruptedException e) {
-                    logger.warn("接收到线程中断异常：", e);
+                    logger.warn("接收到线程中断异常, 准备退出");
                     Thread.currentThread().interrupt();
                 }
             }
@@ -119,7 +121,7 @@ public class Scheduler {
 
         @Override
         public void run() {
-            while (Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted()) {
                 try {
                     String id = completedJobs.take();
                     for (Map.Entry<String, List<TriggerConfig>> entry : allJobTriggers.entrySet()) {
@@ -137,7 +139,7 @@ public class Scheduler {
                         }
                     }
                 } catch (InterruptedException e) {
-                    logger.warn("接收到线程中断异常：", e);
+                    logger.warn("接收到线程中断异常, 准备退出");
                     Thread.currentThread().interrupt();
                 }
             }
@@ -148,7 +150,7 @@ public class Scheduler {
 
         @Override
         public void run() {
-            while (Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted()) {
                 try {
                     String jobId = waitRunJobs.take();
                     logger.info("获取待启动的服务：{}，当前待启动队列长度：{}", jobId, waitRunJobs.size());
@@ -163,7 +165,7 @@ public class Scheduler {
 
                     futures.put(jobId, future);
                 } catch (InterruptedException e) {
-                    logger.warn("接收到线程中断异常：", e);
+                    logger.warn("接收到线程中断异常, 准备退出");
                     Thread.currentThread().interrupt();
                 }
             }
@@ -186,6 +188,17 @@ public class Scheduler {
                             } else {
                                 runningJobs.remove(entry.getKey());
                                 logger.error("服务 {} 运行失败, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
+
+                                EmailConfig config = allJobs.get(entry.getKey()).getEmail();
+                                if (config.isEnable()) {
+                                    MailSender sender = new MailSender(config);
+                                    try {
+                                        sender.send("服务：" + entry.getKey() + " 运行失败，请及时检查失败原因！");
+                                        logger.info("完成向 {} 发送失败邮件通知！", config.getReceiveEmailUsers());
+                                    } catch (Exception e) {
+                                        logger.error("发送邮件通知失败", e);
+                                    }
+                                }
                             }
 
                             rmIds.add(entry.getKey());
@@ -219,7 +232,7 @@ public class Scheduler {
                 waitRunJobs.put(id);
                 logger.info("发现符合启动条件的服务：{}, 添加到待启动队列，当前待启动队列长度：{}", id, waitRunJobs.size());
             } catch (InterruptedException e) {
-                logger.warn("接收到线程中断异常：", e);
+                logger.warn("接收到线程中断异常, 准备退出");
                 Thread.currentThread().interrupt();
             }
         } else if (action == Action.Ignore) {

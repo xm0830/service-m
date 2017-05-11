@@ -42,7 +42,7 @@ public class ServiceManager {
         List<ServiceConfig> configs = null;
         try {
             configs = ConfigLoader.load(confDir);
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("加载服务出现异常", e);
             return;
         }

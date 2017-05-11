@@ -14,6 +14,7 @@ public class ServiceConfig {
     private String name = "";
     private String desc = "";
     private String script = "";
+    private EmailConfig email = new EmailConfig();
     private List<TriggerConfig> triggers = new ArrayList<>();
 
     @JSONField(serialize = false)
@@ -51,6 +52,14 @@ public class ServiceConfig {
         this.script = script;
     }
 
+    public EmailConfig getEmail() {
+        return email;
+    }
+
+    public void setEmail(EmailConfig email) {
+        this.email = email;
+    }
+
     public List<TriggerConfig> getTriggers() {
         return triggers;
     }
@@ -65,5 +74,15 @@ public class ServiceConfig {
 
     public void setPkgDir(String pkgDir) {
         this.pkgDir = pkgDir;
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return id.equals(((ServiceConfig) obj).getId());
     }
 }
