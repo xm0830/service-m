@@ -1,10 +1,10 @@
 package com.rainbow.manager.service;
 
-import com.rainbow.manager.trigger.Trigger;
 import com.rainbow.manager.config.ServiceConfig;
 import com.rainbow.manager.config.TriggerConfig;
 import com.rainbow.manager.trigger.Action;
 import com.rainbow.manager.trigger.Event;
+import com.rainbow.manager.trigger.Trigger;
 import com.rainbow.manager.trigger.TriggerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +33,7 @@ public class Scheduler {
     private ExecutorService service = Executors.newFixedThreadPool(10);
 
     private String homeDir = null;
+    private boolean isStopped = false;
 
     public Scheduler(String homeDir) {
         this.homeDir = homeDir;
@@ -62,13 +63,30 @@ public class Scheduler {
         statusThread.start();
     }
 
+    public void stop() {
+        isStopped = true;
+
+        timeCycleThread.interrupt();
+        jobCompleteThread.interrupt();
+        submitThread.interrupt();
+
+        service.shutdown();
+
+        while (!service.isTerminated() || timeCycleThread.isAlive() || jobCompleteThread.isAlive() || submitThread.isAlive() || statusThread.isAlive()) {
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+            }
+        }
+    }
+
     class TimeCycleThread implements Runnable {
 
         private TriggerManager manager = new TriggerManager();
 
         @Override
         public void run() {
-            while (true) {
+            while (Thread.currentThread().isInterrupted()) {
                 for (Map.Entry<String, List<TriggerConfig>> entry : allJobTriggers.entrySet()) {
                     List<TriggerConfig> triggers = entry.getValue();
 
@@ -87,7 +105,8 @@ public class Scheduler {
                 try {
                     Thread.sleep(3000);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    logger.warn("接收到线程中断异常：", e);
+                    Thread.currentThread().interrupt();
                 }
             }
 
@@ -100,7 +119,7 @@ public class Scheduler {
 
         @Override
         public void run() {
-            while (true) {
+            while (Thread.currentThread().isInterrupted()) {
                 try {
                     String id = completedJobs.take();
                     for (Map.Entry<String, List<TriggerConfig>> entry : allJobTriggers.entrySet()) {
@@ -118,7 +137,8 @@ public class Scheduler {
                         }
                     }
                 } catch (InterruptedException e) {
-                    logger.error("接收到线程中断异常：", e);
+                    logger.warn("接收到线程中断异常：", e);
+                    Thread.currentThread().interrupt();
                 }
             }
         }
@@ -128,7 +148,7 @@ public class Scheduler {
 
         @Override
         public void run() {
-            while (true) {
+            while (Thread.currentThread().isInterrupted()) {
                 try {
                     String jobId = waitRunJobs.take();
                     logger.info("获取待启动的服务：{}，当前待启动队列长度：{}", jobId, waitRunJobs.size());
@@ -143,7 +163,8 @@ public class Scheduler {
 
                     futures.put(jobId, future);
                 } catch (InterruptedException e) {
-                    logger.error("接收到线程中断异常：", e);
+                    logger.warn("接收到线程中断异常：", e);
+                    Thread.currentThread().interrupt();
                 }
             }
         }
@@ -153,10 +174,9 @@ public class Scheduler {
 
         @Override
         public void run() {
-
-            try {
-                List<String> rmIds = new ArrayList<>();
-                while (true) {
+            List<String> rmIds = new ArrayList<>();
+            while (true) {
+                try {
                     for (Map.Entry<String, Future<Integer>> entry : futures.entrySet()) {
                         if (entry.getValue().isDone()) {
                             if (entry.getValue().get() == 0) {
@@ -179,13 +199,16 @@ public class Scheduler {
                         rmIds.clear();
                     }
 
-                    Thread.sleep(10000);
-                }
+                    if (isStopped && futures.isEmpty()) {
+                        break;
+                    }
 
-            } catch (ExecutionException e) {
-                logger.error("执行服务异常：", e);
-            } catch (InterruptedException e) {
-                logger.error("接收到线程中断异常：", e);
+                    Thread.sleep(3000);
+                } catch (ExecutionException e) {
+                    logger.error("执行服务异常：", e);
+                } catch (InterruptedException e) {
+                    logger.error("接收到线程中断异常：", e);
+                }
             }
         }
     }
@@ -196,7 +219,8 @@ public class Scheduler {
                 waitRunJobs.put(id);
                 logger.info("发现符合启动条件的服务：{}, 添加到待启动队列，当前待启动队列长度：{}", id, waitRunJobs.size());
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                logger.warn("接收到线程中断异常：", e);
+                Thread.currentThread().interrupt();
             }
         } else if (action == Action.Ignore) {
 

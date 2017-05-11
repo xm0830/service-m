@@ -1,13 +1,14 @@
 package com.rainbow.manager.main;
 
 import com.rainbow.manager.common.Result;
-import com.rainbow.manager.config.ConfigCheck;
 import com.rainbow.manager.config.ConfigLoader;
 import com.rainbow.manager.config.ServiceConfig;
 import com.rainbow.manager.service.Scheduler;
+import com.rainbow.manager.config.ConfigCheck;
 import org.apache.log4j.PropertyConfigurator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.misc.Signal;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,7 +47,7 @@ public class ServiceManager {
             return;
         }
 
-        logger.info("一共加载{}个服务配置文件，开始检查服务配置文件", configs.size());
+        logger.info("一共加载 {} 个服务配置文件，开始检查服务配置文件", configs.size());
         Result result = check(configs);
 
         if (!result.isSuccess()) {
@@ -58,16 +59,19 @@ public class ServiceManager {
         Scheduler scheduler = new Scheduler(homeDir);
         scheduler.schedule(configs);
 
-        while (true) {
+        Thread mainThread = Thread.currentThread();
+        Signal.handle(new Signal("TERM"), new StopHandler(scheduler, mainThread));
+
+        while (!mainThread.isInterrupted()) {
             try {
                 Thread.sleep(1000 * 10);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                mainThread.interrupt();
             }
         }
     }
 
-    public static Result check(List<ServiceConfig> configs) {
+    private static Result check(List<ServiceConfig> configs) {
         Result result = new Result(true, null);
         Result temp = null;
         for (ServiceConfig config : configs) {

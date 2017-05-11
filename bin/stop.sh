@@ -6,11 +6,11 @@ HOME=$(cd $(dirname $DIR); pwd)
 if [ -f "$HOME/data/process.pid" ]; then
   TARGET_PID=$(cat "$HOME/data/process.pid")
   if kill -0 $TARGET_PID > /dev/null 2>&1; then
-    echo process already started!
-    exit 0
+    echo process will stop after all runnint service completed!
+    kill $TARGET_PID
+  else
+    echo no process to stop
   fi
+else
+  echo no process to stop
 fi
-
-nohup java -cp $CLASSPATH:$HOME/lib/* com.rainbow.manager.main.ServiceManager $HOME >/dev/null 2>&1 &
-
-echo $! > "$HOME/data/process.pid"
