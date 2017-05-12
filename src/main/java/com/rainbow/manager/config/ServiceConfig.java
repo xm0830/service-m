@@ -14,8 +14,8 @@ public class ServiceConfig {
     private String name = "";
     private String desc = "";
     private String script = "";
-    private EmailConfig email = new EmailConfig();
-    private List<TriggerConfig> triggers = new ArrayList<>();
+    private EmailConfig email = null;
+    private List<TriggerConfig> triggers = null;
 
     @JSONField(serialize = false)
     private String pkgDir = "";
