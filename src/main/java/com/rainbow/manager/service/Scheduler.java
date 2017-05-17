@@ -64,7 +64,7 @@ public class Scheduler {
         submitThread.start();
         statusThread.start();
 
-        logger.info("正在等待调度运行符合条件的服务...");
+        logger.info("正在等待调度符合运行条件的服务...");
     }
 
     public void stop() {
