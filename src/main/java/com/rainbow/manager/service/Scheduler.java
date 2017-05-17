@@ -63,6 +63,8 @@ public class Scheduler {
         jobCompleteThread.start();
         submitThread.start();
         statusThread.start();
+
+        logger.info("正在等待调度运行符合条件的服务...");
     }
 
     public void stop() {
