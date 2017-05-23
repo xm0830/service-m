@@ -40,29 +40,34 @@ public class LogWriter implements Closeable {
         });
 
         if (files != null && files.length > 0) {
-            int maxIndex = Integer.MIN_VALUE;
-            int minIndex = Integer.MAX_VALUE;
-            File minIndexFile = null;
-            for (File file : files) {
-                int index = file.getCanonicalPath().lastIndexOf("_");
-                int fileIndex = Integer.parseInt(file.getCanonicalPath().substring(index + 1));
-                if (fileIndex > maxIndex) {
-                    maxIndex = fileIndex;
-                }
+            String first = files[0].getCanonicalPath();
+            int startIndex = first.indexOf("_", first.lastIndexOf("/")) + 1;
+            int endIndex = first.lastIndexOf("_log");
 
-                if (fileIndex < minIndex) {
-                    minIndex = fileIndex;
-                    minIndexFile = file;
+            String minDate = first.substring(startIndex, endIndex);
+            File minFile = files[0];
+            for (int i = 0; i < files.length; i++) {
+                File file = files[i];
+                String  current = file.getCanonicalPath();
+                String currDate = current.substring(startIndex, endIndex);
+
+                if (minDate.compareTo(currDate) > 0) {
+                    minDate = currDate;
+                    minFile = file;
                 }
             }
 
-            if (maxIndex >= maxFileIndex - 1) {
-                minIndexFile.delete();
+            String index = files.length + "";
+            if (minFile != null && files.length >= maxFileIndex) {
+                System.out.println("delete file: " + minFile.getCanonicalPath());
+                minFile.delete();
+
+                String minPath = minFile.getCanonicalPath();
+                index = minPath.substring(minPath.lastIndexOf("_") + 1);
             }
 
             String date = new SimpleDateFormat("yyyyMMddHHmm").format(new Date());
-
-            return logDir + "/" + id + "_" + date + "_log_" + (maxIndex + 1) % maxFileIndex;
+            return logDir + "/" + id + "_" + date + "_log_" + index;
         } else {
             String date = new SimpleDateFormat("yyyyMMddHHmm").format(new Date());
             return logDir + "/" + id + "_" + date + "_log_0";
