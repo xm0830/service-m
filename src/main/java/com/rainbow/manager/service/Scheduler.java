@@ -231,8 +231,12 @@ public class Scheduler {
     private synchronized void addToWaitJobQueue(Action action, String id) {
         if (action == Action.Run) {
             try {
-                waitRunJobs.put(id);
-                logger.info("发现符合启动条件的服务：{}, 添加到待启动队列，当前待启动队列长度：{}", id, waitRunJobs.size());
+                if (!waitRunJobs.contains(id) && !runningJobs.contains(id)) {
+                    waitRunJobs.put(id);
+                    logger.info("发现符合启动条件的服务：{}, 添加到待启动队列，当前待启动队列长度：{}", id, waitRunJobs.size());
+                } else {
+                    logger.warn("服务：{} 已经待运行或者正在运行，忽略此次调度", id);
+                }
             } catch (InterruptedException e) {
                 logger.warn("接收到线程中断异常, 准备退出");
                 Thread.currentThread().interrupt();
