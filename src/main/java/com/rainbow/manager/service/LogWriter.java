@@ -29,6 +29,7 @@ public class LogWriter implements Closeable {
         }
 
         bw.write(line + System.lineSeparator());
+        bw.flush();
     }
 
     private String getNewFile() throws IOException {
