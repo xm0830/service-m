@@ -155,15 +155,12 @@ public class Scheduler {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     String jobId = waitRunJobs.take();
-                    logger.info("获取待启动的服务：{}，当前待启动队列长度：{}", jobId, waitRunJobs.size());
-
                     runningJobs.add(jobId);
-                    logger.info("添加服务到运行队列：{}，当前运行队列长度：{}", jobId, runningJobs.size());
 
                     Context context = new Context(allJobs.get(jobId), homeDir);
                     Launcher launcher = new Launcher(context);
                     Future<Integer> future = service.submit(launcher);
-                    logger.info("开始运行服务: {}", jobId);
+                    logger.info("开始运行服务: {}, 当前待启动服务数量: {}, 正在运行服务数量: {}", jobId, waitRunJobs.size(), runningJobs.size());
 
                     futures.put(jobId, future);
                 } catch (InterruptedException e) {
@@ -185,11 +182,11 @@ public class Scheduler {
                         if (entry.getValue().isDone()) {
                             if (entry.getValue().get() == 0) {
                                 runningJobs.remove(entry.getKey());
-                                logger.info("服务 {} 运行成功, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
+                                logger.info("服务 {} 运行成功, 当前待启动服务数量: {}, 正在运行服务数量: {}", entry.getKey(), waitRunJobs.size(), runningJobs.size());
                                 completedJobs.put(entry.getKey());
                             } else {
                                 runningJobs.remove(entry.getKey());
-                                logger.error("服务 {} 运行失败, 当前运行队列长度：{}", entry.getKey(), runningJobs.size());
+                                logger.error("服务 {} 运行失败, 当前待启动服务数量: {}, 正在运行服务数量: {}", entry.getKey(), waitRunJobs.size(), runningJobs.size());
 
                                 EmailConfig config = allJobs.get(entry.getKey()).getEmail();
                                 if (config.isEnable()) {
@@ -228,15 +225,16 @@ public class Scheduler {
         }
     }
 
-    private synchronized void addToWaitJobQueue(Action action, String id) {
+    private void addToWaitJobQueue(Action action, String id) {
         if (action == Action.Run) {
             try {
                 if (!waitRunJobs.contains(id) && !runningJobs.contains(id)) {
                     waitRunJobs.put(id);
-                    logger.info("发现符合启动条件的服务：{}, 添加到待启动队列，当前待启动队列长度：{}", id, waitRunJobs.size());
+                    logger.info("发现符合启动条件的服务：{}", id);
                 } else {
                     logger.warn("服务：{} 已经待运行或者正在运行，忽略此次调度", id);
                 }
+
             } catch (InterruptedException e) {
                 logger.warn("接收到线程中断异常, 准备退出");
                 Thread.currentThread().interrupt();
